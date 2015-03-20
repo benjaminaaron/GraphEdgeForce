@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>graph layout experiments</title>
+
+		<!-- <script type="text/javascript" src="jquery-2.1.1.min.js"></script> -->
+
+		<style></style>
+
+		<script>
+
+			function dist(x1, y1, x2, y2){
+				return Math.sqrt(Math.pow(x2-x1,2) + Math.pow(y2-y1,2));
+			}
+
+			function runden(val){
+				return Math.round(val * 100) / 100;
+			}
+
+			function drawX(val){
+				return val * 100;
+			}
+
+			function drawY(val){
+				return - val * 100;
+			}
+
+			var ctx;
+			var width = 800;
+			var height = 600;
+			var k = 0;
+
+			var node = function(id, x, y) {
+              	this.id = id;
+              	this.x = x,
+            	this.y = y;
+            	this.connections = [];
+            	this.addConnection = function(node){
+            		this.connections.push(node);
+            	}
+            	this.dx = 0;
+				this.dy = 0;
+				this.addToD = function(dx, dy){
+					this.dx = this.dx + dx;
+					this.dy = this.dy + dy;
+				}
+				this.applyD = function(){
+					this.x = this.x + this.dx;
+					this.y = this.y + this.dy;
+					this.dx = 0;
+					this.dy = 0;
+				}
+            	this.toString = function(){
+            		return this.id + '(' + runden(this.x) + '|' + runden(this.y) + ')';
+            	}
+			}
+
+			var edge = function(node1, node2){
+				this.node1 = node1;
+				this.node2 = node2;
+				node1.addConnection(node2);
+				node2.addConnection(node1);
+
+				this.calc = function(){
+					this.midX = (node1.x + node2.x) / 2;
+					this.midY = (node1.y + node2.y) / 2;
+
+					this.isLength = dist(node1.x, node1.y, node2.x, node2.y);
+					this.targetLength = 2;
+					this.diff = this.isLength - this.targetLength;
+
+					console.log(
+							'[' + node1 + ' >> ' + node2 + ']  '
+							+ runden(this.isLength) + ' ' 
+							+ (this.isLength == this.targetLength ? '= ' : (this.isLength < this.targetLength ? '< ' : '> ')) 
+							+ this.targetLength  + ', mid: ' 
+							+ runden(this.midX) + '/' + runden(this.midY) 
+							+ ', diff: ' + runden(this.diff)
+							);
+				}
+			}
+
+			var nodes = [];
+			var edges = [];
+
+			nodes.push(new node('A',-1,1.5));
+			nodes.push(new node('B',1.5,-0.5));
+			nodes.push(new node('C',-0.5,0));
+			nodes.push(new node('D',1,2));
+			nodes.push(new node('E',-2,1));
+			nodes.push(new node('F',0.5,-2));
+			nodes.push(new node('G',2.5,-1));
+
+
+			edges.push(new edge(nodes[0], nodes[1]));
+			edges.push(new edge(nodes[0], nodes[2]));
+			edges.push(new edge(nodes[1], nodes[2]));
+			edges.push(new edge(nodes[1], nodes[3]));
+			edges.push(new edge(nodes[3], nodes[4]));
+			edges.push(new edge(nodes[2], nodes[4]));
+			edges.push(new edge(nodes[2], nodes[5]));
+			edges.push(new edge(nodes[1], nodes[6]));
+
+
+
+			function init(){
+			  	window.requestAnimationFrame(draw);
+			}
+
+			function draw() {
+				var ctx = document.getElementById('canvas').getContext('2d');
+
+			  	ctx.clearRect(0,0,width,height);		 	
+				ctx.save();
+
+				ctx.translate(width / 2, height / 2);
+
+				//coordinate axis
+
+				ctx.strokeStyle = 'silver';	
+
+				ctx.beginPath();
+				ctx.moveTo(- width / 2, 0);
+				ctx.lineTo(width / 2, 0);
+				ctx.stroke();
+
+				ctx.beginPath();
+				ctx.moveTo(0, - height / 2);
+				ctx.lineTo(0, height / 2);
+				ctx.stroke();
+
+				//draw nodes
+
+				for(var i = 0; i < nodes.length; i++){
+					var node = nodes[i];
+
+					ctx.fillStyle = 'navy';
+					ctx.beginPath();
+					ctx.arc(drawX(node.x), drawY(node.y), 10, 0, Math.PI*2); 
+					ctx.closePath();
+					ctx.fill();
+
+					ctx.fillStyle = 'yellow';
+					ctx.font="16px Georgia";
+					ctx.fillText(node.id, drawX(node.x) - 5, drawY(node.y) + 5);
+				}
+
+				//draw edges
+
+				ctx.strokeStyle = 'gray';
+				ctx.fillStyle = 'gray';
+
+				for(var i = 0; i < edges.length; i++){
+					var edge = edges[i];
+					var node1 = edge.node1;
+					var node2 = edge.node2;	
+					ctx.beginPath();
+					ctx.moveTo(drawX(node1.x), drawY(node1.y));
+					ctx.lineTo(drawX(node2.x), drawY(node2.y));
+					ctx.stroke();
+
+					edge.calc();
+
+/*					ctx.beginPath();
+					ctx.arc(drawX(edge.midX), drawY(edge.midY), 4, 0, Math.PI*2); 
+					ctx.closePath();
+					ctx.fill();*/
+
+					//do the vector forces on the nodes
+
+					var dxn1n2 = node2.x - node1.x;
+					var dyn1n2 = node2.y - node1.y;
+					var dxn2n1 = node1.x - node2.x;
+					var dyn2n1 = node1.y - node2.y;
+
+					var fact = 0.01;
+					node1.addToD(edge.diff * fact * dxn1n2, edge.diff * fact * dyn1n2);
+					node2.addToD(edge.diff * fact * dxn2n1, edge.diff * fact * dyn2n1);
+				}
+
+				var totalD = 0;
+				for(var i = 0; i < nodes.length; i++){
+					totalD = totalD + Math.abs(nodes[i].dx) + Math.abs(nodes[i].dy);
+					nodes[i].applyD();	
+				}
+
+
+				ctx.restore();
+
+				k++;
+
+				console.log('sum factor of all movement: ' + runden(totalD));
+
+				if(totalD * 100 > 1){
+			 		window.requestAnimationFrame(draw);
+			 	}
+			}
+
+			init();
+
+	
+			//$(document).ready(function() {});
+
+
+		</script>
+	</head>
+	<body>
+
+		<canvas id="canvas" width="800" height="600"></canvas>
+
+	</body>
+</html>
