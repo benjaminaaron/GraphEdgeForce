@@ -3,11 +3,124 @@
 	<head>
 		<title>graph layout experiments</title>
 
-		<!-- <script type="text/javascript" src="jquery-2.1.1.min.js"></script> -->
+		<script type="text/javascript" src="js/jquery-2.1.1.min.js"></script>
 
 		<style></style>
 
+	</head>
+	<body>
+	
+		<canvas id="canvas" width="800" height="600"></canvas>
+		<br>
+		<input type="submit" id="goStopBtn" value="go" onclick="goStopClick()">
+		<input type="submit" id="resetBtn" value="reset" onclick="reset()">
+
 		<script>
+
+			var animate = false;
+			var ctx;
+			var width = 800;
+			var height = 600;
+			var nodeRadius = 10;
+
+			$("#canvas").mousedown(function(e){handleMouseDown(e);});
+			$("#canvas").mouseup(function(e){handleMouseUp(e);});
+
+			var canvasOffset = $("#canvas").offset();
+		    var offsetX = canvasOffset.left;
+		    var offsetY = canvasOffset.top;
+
+		    var mouseDownClickedNode = null;
+
+			function handleMouseDown(e){
+				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / 100;
+			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / 100;
+			  	console.log("mouse down: "+ mouseX + " / " + mouseY);		 
+			  	var isOnNodeResult = isOnNode(mouseX, mouseY);
+			  	if(isOnNodeResult){ // = mouse down on existing node
+			  		mouseDownClickedNode = isOnNodeResult;
+			  	}
+			}
+
+			function handleMouseUp(e){
+				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / 100;
+			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / 100;
+				console.log("mouse up: "+ mouseX + " / " + mouseY);
+
+				var isOnNodeResult = isOnNode(mouseX, mouseY);	
+
+			  	if(isOnNodeResult){ // = mouse up on existing node		  			  		
+			  		if(mouseDownClickedNode != null && mouseDownClickedNode != isOnNodeResult){	
+			  			console.log('new edge:');
+			  			edges.push(new edge(mouseDownClickedNode, isOnNodeResult));
+			  			mouseDownClickedNode = null;
+			  		} else {
+			  			console.log('deleting node');
+			  			deleteEdgesIncidentWithNode(isOnNodeResult);
+						nodes.splice(nodes.indexOf(isOnNodeResult), 1);
+			  		}
+			  	} else {
+			  		//not on any node with down or up
+
+			  		//var isOnEdgeResult = isOnEdge(mouseX, mouseY); //TODO
+
+			  		console.log('new node');
+					nodes.push(new node(mouseX,mouseY));
+			  	}
+			  	window.requestAnimationFrame(draw);
+			}
+
+			function isOnNode(x, y){
+				for(var i=0; i < nodes.length; i++){
+					if(dist(x,y,nodes[i].x, nodes[i].y) <= nodeRadius / 100){
+						return nodes[i];
+					}
+				}
+				return false;
+			}
+
+			function isOnEdge(x, y){
+				for(var i=0; i < edges.length; i++){
+	
+/*					//not a good way to test:
+					var edge = edges[i];
+					var edgeLength = dist(edge.node1.x, edge.node1.y, edge.node2.x, edge.node2.y); 	//c
+					var n1toClick = dist(x, y, edge.node1.x, edge.node1.y);							//a
+					var n2toClick = dist(x, y, edge.node2.x, edge.node2.y);							//b
+					var beta = Math.acos((Math.pow(n1toClick,2) + Math.pow(edgeLength,2) - Math.pow(n2toClick,2)) / (2 * n1toClick * edgeLength));
+					var distLineClick = n1toClick * Math.sin(beta); //h
+					console.log('distance of click to edge ' + edge + ' : ' + distLineClick);*/
+				}
+			}
+
+			function deleteEdgesIncidentWithNode(node){
+				var candidateIndex = -1;
+				for(var i = 0; i < edges.length; i++){
+					if(edges[i].node1 == node || edges[i].node2 == node){
+						candidateIndex = i;
+					}
+				}
+				if(candidateIndex != -1){
+					edges.splice(candidateIndex, 1);
+					deleteEdgesIncidentWithNode(node);
+				} 
+			}
+
+			function goStopClick(){			
+				var btn = document.getElementById("goStopBtn");
+				if(btn.value == 'go'){
+					btn.value = 'stop';
+					animate = true;
+					window.requestAnimationFrame(draw);
+				} else {
+					btn.value = 'go';
+					animate = false;
+				}	
+			}
+
+			function reset(){
+				location.reload();
+			}
 
 			function dist(x1, y1, x2, y2){
 				return Math.sqrt(Math.pow(x2-x1,2) + Math.pow(y2-y1,2));
@@ -25,13 +138,11 @@
 				return - val * 100;
 			}
 
-			var ctx;
-			var width = 800;
-			var height = 600;
-			var k = 0;
+			var nodes = [];
+			var edges = [];
 
-			var node = function(id, x, y) {
-              	this.id = id;
+			var node = function(x, y) {
+              	this.id = nodes.length + 1;
               	this.x = x,
             	this.y = y;
             	this.connections = [];
@@ -60,37 +171,34 @@
 				this.node2 = node2;
 				node1.addConnection(node2);
 				node2.addConnection(node1);
-
+				this.diff = 100; //just something high
+				this.toString = function(){
+					return '[' + node1 + ' >> ' + node2 + ']';
+				}
 				this.calc = function(){
-					this.midX = (node1.x + node2.x) / 2;
-					this.midY = (node1.y + node2.y) / 2;
-
+					/*this.midX = (node1.x + node2.x) / 2;
+					this.midY = (node1.y + node2.y) / 2;*/
 					this.isLength = dist(node1.x, node1.y, node2.x, node2.y);
 					this.targetLength = 2;
 					this.diff = this.isLength - this.targetLength;
-
-					console.log(
+/*					console.log(
 							'[' + node1 + ' >> ' + node2 + ']  '
 							+ runden(this.isLength) + ' ' 
 							+ (this.isLength == this.targetLength ? '= ' : (this.isLength < this.targetLength ? '< ' : '> ')) 
 							+ this.targetLength  + ', mid: ' 
 							+ runden(this.midX) + '/' + runden(this.midY) 
 							+ ', diff: ' + runden(this.diff)
-							);
+							);*/
 				}
 			}
 
-			var nodes = [];
-			var edges = [];
-
-			nodes.push(new node('A',-1,1.5));
-			nodes.push(new node('B',1.5,-0.5));
-			nodes.push(new node('C',-0.5,0));
-			nodes.push(new node('D',1,2));
-			nodes.push(new node('E',-2,1));
-			nodes.push(new node('F',0.5,-2));
-			nodes.push(new node('G',2.5,-1));
-
+			nodes.push(new node(-1,1.5));
+			nodes.push(new node(1.5,-0.5));
+			nodes.push(new node(-0.5,0));
+			nodes.push(new node(1,2));
+			nodes.push(new node(-2,1));
+			nodes.push(new node(0.5,-2));
+			nodes.push(new node(2.5,-1));
 
 			edges.push(new edge(nodes[0], nodes[1]));
 			edges.push(new edge(nodes[0], nodes[2]));
@@ -100,8 +208,6 @@
 			edges.push(new edge(nodes[2], nodes[4]));
 			edges.push(new edge(nodes[2], nodes[5]));
 			edges.push(new edge(nodes[1], nodes[6]));
-
-
 
 			function init(){
 			  	window.requestAnimationFrame(draw);
@@ -129,22 +235,6 @@
 				ctx.lineTo(0, height / 2);
 				ctx.stroke();
 
-				//draw nodes
-
-				for(var i = 0; i < nodes.length; i++){
-					var node = nodes[i];
-
-					ctx.fillStyle = 'navy';
-					ctx.beginPath();
-					ctx.arc(drawX(node.x), drawY(node.y), 10, 0, Math.PI*2); 
-					ctx.closePath();
-					ctx.fill();
-
-					ctx.fillStyle = 'yellow';
-					ctx.font="16px Georgia";
-					ctx.fillText(node.id, drawX(node.x) - 5, drawY(node.y) + 5);
-				}
-
 				//draw edges
 
 				ctx.strokeStyle = 'gray';
@@ -154,59 +244,67 @@
 					var edge = edges[i];
 					var node1 = edge.node1;
 					var node2 = edge.node2;	
+
+					if(Math.abs(edge.diff) < 0.05){
+						ctx.strokeStyle = 'orange';
+						ctx.lineWidth = 2;
+					} else {
+						ctx.strokeStyle = 'gray';
+						ctx.lineWidth = 1;
+					}
 					ctx.beginPath();
 					ctx.moveTo(drawX(node1.x), drawY(node1.y));
 					ctx.lineTo(drawX(node2.x), drawY(node2.y));
 					ctx.stroke();
-
-					edge.calc();
-
-/*					ctx.beginPath();
-					ctx.arc(drawX(edge.midX), drawY(edge.midY), 4, 0, Math.PI*2); 
-					ctx.closePath();
-					ctx.fill();*/
-
-					//do the vector forces on the nodes
-
-					var dxn1n2 = node2.x - node1.x;
-					var dyn1n2 = node2.y - node1.y;
-					var dxn2n1 = node1.x - node2.x;
-					var dyn2n1 = node1.y - node2.y;
-
-					var fact = 0.01;
-					node1.addToD(edge.diff * fact * dxn1n2, edge.diff * fact * dyn1n2);
-					node2.addToD(edge.diff * fact * dxn2n1, edge.diff * fact * dyn2n1);
+				
+					if(animate){
+						edge.calc();
+						/*ctx.beginPath();
+						ctx.arc(drawX(edge.midX), drawY(edge.midY), 3, 0, Math.PI*2); 
+						ctx.closePath();
+						ctx.fill();*/
+						//do the vector forces on the nodes
+						var dxn1n2 = node2.x - node1.x;
+						var dyn1n2 = node2.y - node1.y;
+						var dxn2n1 = node1.x - node2.x;
+						var dyn2n1 = node1.y - node2.y;
+						var fact = 0.01;
+						node1.addToD(edge.diff * fact * dxn1n2, edge.diff * fact * dyn1n2);
+						node2.addToD(edge.diff * fact * dxn2n1, edge.diff * fact * dyn2n1);
+					}
 				}
 
-				var totalD = 0;
+				//draw nodes
+
 				for(var i = 0; i < nodes.length; i++){
-					totalD = totalD + Math.abs(nodes[i].dx) + Math.abs(nodes[i].dy);
-					nodes[i].applyD();	
+					var node = nodes[i];
+
+					ctx.fillStyle = 'navy';
+					ctx.beginPath();
+					ctx.arc(drawX(node.x), drawY(node.y), nodeRadius, 0, Math.PI*2); 
+					ctx.closePath();
+					ctx.fill();
+
+					ctx.fillStyle = 'white';
+					ctx.font="14px Georgia";
+					ctx.fillText(node.id, drawX(node.x) - 4, drawY(node.y) + 3);
 				}
 
+				if(animate)
+					for(var i = 0; i < nodes.length; i++)			
+						nodes[i].applyD();				
 
 				ctx.restore();
 
-				k++;
-
-				console.log('sum factor of all movement: ' + runden(totalD));
-
-				if(totalD * 100 > 1){
+			 	if(animate) //if(totalD * 100 > 1){ //totalD = totalD + Math.abs(nodes[i].dx) + Math.abs(nodes[i].dy);
 			 		window.requestAnimationFrame(draw);
-			 	}
 			}
 
 			init();
-
 	
 			//$(document).ready(function() {});
 
-
 		</script>
-	</head>
-	<body>
-
-		<canvas id="canvas" width="800" height="600"></canvas>
 
 	</body>
 </html>
