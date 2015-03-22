@@ -5,22 +5,82 @@
 
 		<script type="text/javascript" src="js/jquery-2.1.1.min.js"></script>
 
-		<style></style>
+		<style>
+
+			* {
+				font-family: Georgia, sans-serif;
+				font-size:  14px;
+			}
+			#goStopBtn{
+				font-size: 30px;
+				color: navy;
+			}
+			.floatLeft{
+				float: left;
+			}
+			.edgeTableCellDiv{
+				float: left;
+			}
+			.edgeTableCellInput{
+				float: right;
+				text-align: center;
+			}
+
+			/* for glow-animation after changing targetLength... TODO
+			.edgeTableCellWrapperDiv{
+    			background-color: #ff0000;
+			} */
+
+		</style>
 
 	</head>
 	<body>
-	
-		<canvas id="canvas" width="800" height="600"></canvas>
-		<br>
-		<input type="submit" id="goStopBtn" value="go" onclick="goStopClick()">
-		<input type="submit" id="resetBtn" value="reset" onclick="reset()">
+
+
+		<canvas id="canvas" class='floatLeft' width="800" height="600"></canvas>
+
+		<table class='floatLeft'>
+			<tr>
+				<td valign='top'>
+					<input type="submit" id="goStopBtn" value="go" onclick="goStopClick()">
+					<input type="submit" value="reset" onclick="reset()">
+					<br><br>
+					randomize:
+					<input type="submit" value="nodes" onclick="randomizeNodePositions()">
+					<input type="submit" value="edges" onclick="randomizeEdges()">
+					<input type="submit" value="n. + e." onclick="randomSetup(false)">
+					<input type="submit" value="n. + e. + target lengths" onclick="randomSetup(true)">
+					<br><br>
+					shake:
+					<input type="submit" value="small" onclick="smallShake()">
+					<input type="submit" value="medium" onclick="mediumShake()">
+					<input type="submit" value="big" onclick="bigShake()">
+					<br><br>
+					<i>Coming up: save and load (own and gallery) nice configurations</i>
+					<br><br>
+					<table id='nodesTable' border='0'></table>
+					<br>
+					<table id='edgesTable' border='0'></table>
+				</td>
+			</tr>
+		</table>
 
 		<script>
 
+			//TODO add (anti-)gravity btwn nodes :)
+			//TODO change targetLengths
+
 			var animate = false;
 			var ctx;
-			var width = 800;
+			var screenToModelFactor = 100;
+			var width = 800;		
+			var xWidth = 8;
+			var xMin = -4;
+			var xMax = 4;
 			var height = 600;
+			var yHeight = 6;
+			var yMin = -3;
+			var yMax = 3;
 			var nodeRadius = 10;
 
 			$("#canvas").mousedown(function(e){handleMouseDown(e);});
@@ -33,9 +93,9 @@
 		    var mouseDownClickedNode = null;
 
 			function handleMouseDown(e){
-				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / 100;
-			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / 100;
-			  	console.log("mouse down: "+ mouseX + " / " + mouseY);		 
+				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / screenToModelFactor;
+			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / screenToModelFactor;
+			  	//console.log("mouse down: "+ mouseX + " / " + mouseY);		 
 			  	var isOnNodeResult = isOnNode(mouseX, mouseY);
 			  	if(isOnNodeResult){ // = mouse down on existing node
 			  		mouseDownClickedNode = isOnNodeResult;
@@ -43,9 +103,9 @@
 			}
 
 			function handleMouseUp(e){
-				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / 100;
-			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / 100;
-				console.log("mouse up: "+ mouseX + " / " + mouseY);
+				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / screenToModelFactor;
+			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / screenToModelFactor;
+				//console.log("mouse up: "+ mouseX + " / " + mouseY);
 
 				var isOnNodeResult = isOnNode(mouseX, mouseY);	
 
@@ -53,26 +113,28 @@
 			  		if(mouseDownClickedNode != null && mouseDownClickedNode != isOnNodeResult){	
 			  			console.log('new edge:');
 			  			edges.push(new edge(mouseDownClickedNode, isOnNodeResult));
-			  			mouseDownClickedNode = null;
 			  		} else {
-			  			console.log('deleting node');
+			  			console.log('deleting node ' + isOnNodeResult);
 			  			deleteEdgesIncidentWithNode(isOnNodeResult);
 						nodes.splice(nodes.indexOf(isOnNodeResult), 1);
 			  		}
-			  	} else {
-			  		//not on any node with down or up
-
-			  		//var isOnEdgeResult = isOnEdge(mouseX, mouseY); //TODO
-
-			  		console.log('new node');
-					nodes.push(new node(mouseX,mouseY));
+			  	} else { //not on any node with down or up
+			  		var isOnEdgeResult = isOnEdge(mouseX, mouseY);
+			  		if(isOnEdgeResult){
+			  			console.log('deleting edge ' + isOnEdgeResult);
+			  			edges.splice(edges.indexOf(isOnEdgeResult), 1);
+			  		} else {
+			  			console.log('new node');
+						nodes.push(new node(mouseX,mouseY));
+			  		}
 			  	}
+			  	mouseDownClickedNode = null;
 			  	window.requestAnimationFrame(draw);
 			}
 
 			function isOnNode(x, y){
 				for(var i=0; i < nodes.length; i++){
-					if(dist(x,y,nodes[i].x, nodes[i].y) <= nodeRadius / 100){
+					if(dist(x,y,nodes[i].x, nodes[i].y) <= nodeRadius / screenToModelFactor){
 						return nodes[i];
 					}
 				}
@@ -81,16 +143,57 @@
 
 			function isOnEdge(x, y){
 				for(var i=0; i < edges.length; i++){
-	
-/*					//not a good way to test:
 					var edge = edges[i];
-					var edgeLength = dist(edge.node1.x, edge.node1.y, edge.node2.x, edge.node2.y); 	//c
-					var n1toClick = dist(x, y, edge.node1.x, edge.node1.y);							//a
-					var n2toClick = dist(x, y, edge.node2.x, edge.node2.y);							//b
-					var beta = Math.acos((Math.pow(n1toClick,2) + Math.pow(edgeLength,2) - Math.pow(n2toClick,2)) / (2 * n1toClick * edgeLength));
-					var distLineClick = n1toClick * Math.sin(beta); //h
-					console.log('distance of click to edge ' + edge + ' : ' + distLineClick);*/
+		
+					//TODO catch case where line is exactly vertical
+
+					//(x,y) + alpha(x,y)
+					var lineOriginX = edge.node1.x;
+					var lineOriginY = edge.node1.y;
+					var lineDirvectX = edge.node2.x - edge.node1.x;
+					var lineDirvectY = edge.node2.y - edge.node1.y;
+
+					//ax + by = 0; //(x,y) + beta(x,y)
+					var orthLineOriginX = x;
+					var orthLineOriginY = y;
+					var orthLineDirvectX = 1;
+					var orthLineDirvectY = (- lineDirvectX * orthLineDirvectX) / lineDirvectY;
+
+					var matrixPos11 = lineDirvectX;
+					var matrixPos12 = - orthLineDirvectX;
+					var matrixPos13 = orthLineOriginX - lineOriginX;
+					var matrixPos21 = lineDirvectY;
+					var matrixPos22 = - orthLineDirvectY;
+					var matrixPos23 = orthLineOriginY - lineOriginY;
+
+					// one step gauss-elimination
+
+					var rowFact = matrixPos11 / matrixPos21;
+					var matrixPos21 = rowFact * matrixPos21 - matrixPos11; //test
+					var matrixPos22 = rowFact * matrixPos22 - matrixPos12;
+					var matrixPos23 = rowFact * matrixPos23 - matrixPos13;
+
+					/*console.log('matrix:');
+					console.log(matrixPos11 + '\t' + matrixPos12 + '\t|\t' + matrixPos13);
+					console.log(matrixPos21 + '\t' + matrixPos22 + '\t|\t' + matrixPos23);*/
+
+					var beta = matrixPos23 / matrixPos22; //alpha not needed
+
+					var intersectionX = orthLineOriginX + beta * orthLineDirvectX;
+					var intersectionY = orthLineOriginY + beta * orthLineDirvectY;
+
+					//console.log('intersection: ' + intersectionX + '|' + intersectionY);
+
+					var distSN1 = dist(edge.node1.x, edge.node1.y, intersectionX, intersectionY);
+					var distSN2 = dist(edge.node2.x, edge.node2.y, intersectionX, intersectionY);
+
+					var intersectionIsBtwnNodes = Math.abs(edge.getLength() - (distSN1 + distSN2)) < 0.1;
+					var distIntersectionClickIsWithinBuffer = dist(x, y, intersectionX, intersectionY) < 0.05;
+
+					if(intersectionIsBtwnNodes && distIntersectionClickIsWithinBuffer)
+						return edge;
 				}
+				return false;
 			}
 
 			function deleteEdgesIncidentWithNode(node){
@@ -116,39 +219,76 @@
 					btn.value = 'go';
 					animate = false;
 				}	
-			}
+			}		
 
 			function reset(){
 				location.reload();
 			}
 
+			function smallShake(){
+				shake(0.2);
+			}
+
+			function mediumShake(){
+				shake(0.8);
+			}
+
+			function bigShake(){
+				shake(1.4);
+			}
+
+			function shake(val){
+				for(var i=0; i < nodes.length; i++){
+					var lowerBound = - val;
+					var fact = 2 * Math.abs(val);
+					var rand1 = lowerBound + Math.random() * fact;
+					var rand2 = lowerBound + Math.random() * fact;
+					nodes[i].addToD(rand1, rand2);
+					nodes[i].applyD();	
+				}
+				window.requestAnimationFrame(draw);
+			}
+
+			function randomizeNodePositions(){
+				for(var i=0; i < nodes.length; i++){
+					nodes[i].x = xMin + Math.random() * xWidth;
+					nodes[i].y = yMin + Math.random() * yHeight;	
+				}
+				window.requestAnimationFrame(draw);
+			}
+
+
 			function dist(x1, y1, x2, y2){
 				return Math.sqrt(Math.pow(x2-x1,2) + Math.pow(y2-y1,2));
 			}
 
-			function runden(val){
-				return Math.round(val * 100) / 100;
+			function roundNumb(val, decPlaces){
+				var fact = Math.pow(10,decPlaces);
+				return Math.round(val * fact) / fact;
 			}
 
 			function drawX(val){
-				return val * 100;
+				return val * screenToModelFactor;
 			}
 
 			function drawY(val){
-				return - val * 100;
+				return - val * screenToModelFactor;
 			}
 
 			var nodes = [];
-			var edges = [];
+			var runningNodeCounter = 0;
 
 			var node = function(x, y) {
-              	this.id = nodes.length + 1;
+				this.id = runningNodeCounter ++;
               	this.x = x,
             	this.y = y;
-            	this.connections = [];
-            	this.addConnection = function(node){
-            		this.connections.push(node);
-            	}
+
+				var table = $('#nodesTable');
+				var tr = $('<tr/>').appendTo(table); 
+				var td = $('<td/>').attr({
+					'id' : 'node_' + this.id
+				}).appendTo(tr); 
+
             	this.dx = 0;
 				this.dy = 0;
 				this.addToD = function(dx, dy){
@@ -162,34 +302,93 @@
 					this.dy = 0;
 				}
             	this.toString = function(){
-            		return this.id + '(' + runden(this.x) + '|' + runden(this.y) + ')';
+            		return this.id + '(' + roundNumb(this.x,2) + '|' + roundNumb(this.y,2) + ')';
             	}
 			}
 
-			var edge = function(node1, node2){
+			var edges = [];
+			var runningEdgeCounter = 0;
+
+			var edge = function(node1, node2, targetLength){
+				this.id = runningEdgeCounter ++;
+
 				this.node1 = node1;
 				this.node2 = node2;
-				node1.addConnection(node2);
-				node2.addConnection(node1);
-				this.diff = 100; //just something high
+				this.targetLength = targetLength;
+
+				var table = $('#edgesTable');
+				var tr = $('<tr/>').appendTo(table); 
+				var td = $('<td/>').appendTo(tr); 
+/*				var wrapperDiv = $('<div/>').attr({
+					'class' : 'edgeTableCellWrapperDiv',
+					'id' : 'edgeWrap_' + this.id
+				}).appendTo(td);*/
+				var div = $('<div/>').attr({
+					'class' : 'edgeTableCellDiv',
+					'id' : 'edge_' + this.id
+				}).appendTo(td);
+
+				var input = $('<input/>').attr({
+					'type' : 'text',
+					'size' : 1,
+					'id' : 'edgeInput_' + this.id,
+					'class' : 'edgeTableCellInput'
+				}).appendTo(td).val(roundNumb(this.targetLength,1));
+
+				this.getLength = function(){
+					return dist(node1.x, node1.y, node2.x, node2.y);
+				}
+				this.getLengthDiff = function(){
+					return this.getLength() - this.targetLength;
+				}
+				this.getTension = function(){ //1 is perfect, lower than 1 is too short, bigger than 1 is too long
+					return this.getLength() / this.targetLength;
+				}
 				this.toString = function(){
 					return '[' + node1 + ' >> ' + node2 + ']';
 				}
-				this.calc = function(){
-					/*this.midX = (node1.x + node2.x) / 2;
-					this.midY = (node1.y + node2.y) / 2;*/
-					this.isLength = dist(node1.x, node1.y, node2.x, node2.y);
-					this.targetLength = 2;
-					this.diff = this.isLength - this.targetLength;
-/*					console.log(
-							'[' + node1 + ' >> ' + node2 + ']  '
-							+ runden(this.isLength) + ' ' 
-							+ (this.isLength == this.targetLength ? '= ' : (this.isLength < this.targetLength ? '< ' : '> ')) 
-							+ this.targetLength  + ', mid: ' 
-							+ runden(this.midX) + '/' + runden(this.midY) 
-							+ ', diff: ' + runden(this.diff)
-							);*/
+			}
+
+			function randomSetup(randomizeTargetLength){
+				randomizeNodes();
+				randomizeEdges(randomizeTargetLength);
+				activateInputFieldListener();
+			}
+
+			function randomizeNodes(){
+				$('#nodesTable').empty();
+				runningNodeCounter = 0;
+				var numbNodes = 3 + Math.round(Math.random() * 5);
+				nodes = [];
+				for(var i=0; i < numbNodes; i++)
+					nodes.push(new node(xMin + Math.random() * xWidth, yMin + Math.random() * yHeight));	
+			}
+
+			function randomizeEdges(randomizeTargetLength){
+				$('#edgesTable').empty();
+				runningEdgeCounter = 0;
+				var maxPairsOfTwo = 0.5 * nodes.length * (nodes.length - 1);
+				var numbEdges = Math.round(Math.random() * maxPairsOfTwo);	
+				edges = [];
+				var i = 0;
+				var createdEdgesRegister = [];
+				while(i < numbEdges){
+					var node1Index = Math.round(Math.random() * (nodes.length - 1));
+					var node2Index = Math.round(Math.random() * (nodes.length - 1));
+					var edgeExistsAlready = node1Index == node2Index;
+					for(var j=0; j < createdEdgesRegister.length; j++)
+						if((node1Index + '_' + node2Index) == createdEdgesRegister[j])
+							edgeExistsAlready = true;
+					if(!edgeExistsAlready){
+						createdEdgesRegister.push(node1Index + '_' + node2Index);
+						createdEdgesRegister.push(node2Index + '_' + node1Index);
+						var targetLength = randomizeTargetLength ? Math.random() * 5 : 2;
+						var newEdge = new edge(nodes[node1Index], nodes[node2Index], targetLength);
+						edges.push(newEdge);
+						i++;
+					}
 				}
+				window.requestAnimationFrame(draw);
 			}
 
 			nodes.push(new node(-1,1.5));
@@ -200,14 +399,18 @@
 			nodes.push(new node(0.5,-2));
 			nodes.push(new node(2.5,-1));
 
-			edges.push(new edge(nodes[0], nodes[1]));
-			edges.push(new edge(nodes[0], nodes[2]));
-			edges.push(new edge(nodes[1], nodes[2]));
-			edges.push(new edge(nodes[1], nodes[3]));
-			edges.push(new edge(nodes[3], nodes[4]));
-			edges.push(new edge(nodes[2], nodes[4]));
-			edges.push(new edge(nodes[2], nodes[5]));
-			edges.push(new edge(nodes[1], nodes[6]));
+			edges.push(new edge(nodes[0], nodes[1], 2));
+			edges.push(new edge(nodes[0], nodes[2], 2));
+			edges.push(new edge(nodes[1], nodes[2], 2));
+			edges.push(new edge(nodes[1], nodes[3], 2));
+			edges.push(new edge(nodes[3], nodes[4], 2));
+			edges.push(new edge(nodes[2], nodes[4], 2));
+			edges.push(new edge(nodes[2], nodes[5], 2));
+			edges.push(new edge(nodes[1], nodes[6], 2));
+
+/*			nodes.push(new node(1,1.5));
+			nodes.push(new node(3,2.5));
+			edges.push(new edge(nodes[0], nodes[1]));*/
 
 			function init(){
 			  	window.requestAnimationFrame(draw);
@@ -215,13 +418,12 @@
 
 			function draw() {
 				var ctx = document.getElementById('canvas').getContext('2d');
-
 			  	ctx.clearRect(0,0,width,height);		 	
 				ctx.save();
 
 				ctx.translate(width / 2, height / 2);
 
-				//coordinate axis
+				// DRAW COORD AXIS
 
 				ctx.strokeStyle = 'silver';	
 
@@ -235,46 +437,53 @@
 				ctx.lineTo(0, height / 2);
 				ctx.stroke();
 
-				//draw edges
-
-				ctx.strokeStyle = 'gray';
-				ctx.fillStyle = 'gray';
+				// DRAW EDGES
 
 				for(var i = 0; i < edges.length; i++){
 					var edge = edges[i];
 					var node1 = edge.node1;
 					var node2 = edge.node2;	
 
-					if(Math.abs(edge.diff) < 0.05){
-						ctx.strokeStyle = 'orange';
+					var edgeTension = edge.getTension();
+
+					if(Math.abs(edgeTension - 1) < 0.05)
+						ctx.lineWidth = 3;
+					else
 						ctx.lineWidth = 2;
-					} else {
-						ctx.strokeStyle = 'gray';
-						ctx.lineWidth = 1;
+
+					if(edgeTension <= 1){ //too short
+							var col = Math.round(Math.pow(1 - edgeTension,0.3) * 255);
+							ctx.strokeStyle = 'rgb(' + col + ',0,0)';
+					} else { //too long
+							var col = Math.round((1 - Math.pow(1/edgeTension,7)) * 255);
+							ctx.strokeStyle = 'rgb(0,0,' + col + ')';
 					}
+
 					ctx.beginPath();
 					ctx.moveTo(drawX(node1.x), drawY(node1.y));
 					ctx.lineTo(drawX(node2.x), drawY(node2.y));
 					ctx.stroke();
+
+					$('#edge_' + i).html('e' + edge.id + ' <strong>' + node1.id + '-' + node2.id + '</strong> (' + roundNumb(edgeTension,1) + ')&nbsp;&nbsp;');
 				
 					if(animate){
-						edge.calc();
-						/*ctx.beginPath();
-						ctx.arc(drawX(edge.midX), drawY(edge.midY), 3, 0, Math.PI*2); 
-						ctx.closePath();
-						ctx.fill();*/
-						//do the vector forces on the nodes
+						// calc forces that this edge enacts onto the two nodes it is incident with
 						var dxn1n2 = node2.x - node1.x;
 						var dyn1n2 = node2.y - node1.y;
-						var dxn2n1 = node1.x - node2.x;
-						var dyn2n1 = node1.y - node2.y;
+						var dxn2n1 = - dxn1n2;
+						var dyn2n1 = - dyn1n2;
 						var fact = 0.01;
-						node1.addToD(edge.diff * fact * dxn1n2, edge.diff * fact * dyn1n2);
-						node2.addToD(edge.diff * fact * dxn2n1, edge.diff * fact * dyn2n1);
+						var edgeDiff = edge.getLengthDiff();
+						node1.addToD(edgeDiff * fact * dxn1n2, edgeDiff * fact * dyn1n2);
+						node2.addToD(edgeDiff * fact * dxn2n1, edgeDiff * fact * dyn2n1);
 					}
 				}
 
-				//draw nodes
+				if(animate)
+					for(var i = 0; i < nodes.length; i++)			
+						nodes[i].applyD();	
+
+				// DRAW NODES
 
 				for(var i = 0; i < nodes.length; i++){
 					var node = nodes[i];
@@ -288,11 +497,9 @@
 					ctx.fillStyle = 'white';
 					ctx.font="14px Georgia";
 					ctx.fillText(node.id, drawX(node.x) - 4, drawY(node.y) + 3);
-				}
 
-				if(animate)
-					for(var i = 0; i < nodes.length; i++)			
-						nodes[i].applyD();				
+					$('#node_' + i).html('n<strong>' + node.id + '</strong> (' + roundNumb(node.x,2) + ',' + roundNumb(node.y,2) + ')');
+				}			
 
 				ctx.restore();
 
@@ -301,9 +508,95 @@
 			}
 
 			init();
-	
-			//$(document).ready(function() {});
 
+
+			function activateInputFieldListener(){
+				$("input[type='text']").change(function() {	
+					var newTargetLength = $(this).val();
+					var edgeID = $(this).context.id.split('_')[1];
+					var edge = edges[edgeID];
+					edge.targetLength = newTargetLength;
+				});
+	/*			$("input[type='text']").keypress(function(event) {
+				   console.log(this);
+				   console.log($(this).val() + event.key);
+				});*/
+			}
+
+			$(document).ready(function() {
+				activateInputFieldListener();
+			});
+			
+
+
+/*	PARKING LOT
+
+	// DRAW LINES (if any)
+	ctx.strokeStyle = 'green';
+	for(var i = 0; i < lines.length; i++){
+		var line = lines[i];
+		ctx.beginPath();
+		ctx.moveTo(drawX(line.x1), drawY(line.y1));
+		ctx.lineTo(drawX(line.x2), drawY(line.y2));
+		ctx.stroke();	
+	}
+
+	var line = function(x1, y1, x2, y2){
+		this.x1 = x1;
+		this.y1 = y1;
+		this.x2 = x2;
+		this.y2 = y2;
+	}
+	var lines = [];
+
+	//not a good way to test click-nearness to edge, triangle:
+	var edge = edges[i];
+	var edgeLength = dist(edge.node1.x, edge.node1.y, edge.node2.x, edge.node2.y); 	//c
+	var n1toClick = dist(x, y, edge.node1.x, edge.node1.y);							//a
+	var n2toClick = dist(x, y, edge.node2.x, edge.node2.y);							//b
+	var beta = Math.acos((Math.pow(n1toClick,2) + Math.pow(edgeLength,2) - Math.pow(n2toClick,2)) / (2 * n1toClick * edgeLength));
+	var distLineClick = n1toClick * Math.sin(beta); //h
+	console.log('distance of click to edge ' + edge + ' : ' + distLineClick);
+
+	//next attempt with rotating the rectangle didn't quite work either (but might with more work)
+
+	var rotation = Math.atan((edge.node1.x - edge.node2.x) / (edge.node1.y - edge.node2.y));
+	//var rotInDegree = (rotation / (2 * Math.PI)) * 360;
+	var rotatedN2x = edge.node1.x;
+	var rotatedN2y = edge.node1.y - edge.getLength();		
+	var rotatedClickX = Math.cos(rotation) * (x - edge.node1.x) - Math.sin(rotation) * (y - edge.node1.y) + edge.node1.x;
+	var rotatedClickY = Math.sin(rotation) * (x - edge.node1.x) + Math.cos(rotation) * (y - edge.node1.y) + edge.node1.y;
+	var bufferzone = 0.1;
+	lines.push(new line(edge.node1.x, edge.node1.y, rotatedN2x, rotatedN2y));
+	lines.push(new line(edge.node1.x, edge.node1.y, x, y));
+	nodes.push(new node(rotatedClickX, rotatedClickY));
+	console.log(Math.abs(rotatedClickX - edge.node1.x));
+	console.log(rotatedClickY);
+	console.log(edge.node1.y);
+	console.log(rotatedN2y);
+	if(Math.abs(rotatedClickX - edge.node1.x) < bufferzone && rotatedClickY < edge.node1.y && rotatedClickY > rotatedN2y) //counts as click on edge
+	return edge;
+
+
+	ctx.beginPath();
+	ctx.arc(drawX(edge.midX), drawY(edge.midY), 3, 0, Math.PI*2); 
+	ctx.closePath();
+	ctx.fill();
+
+	$(document).ready(function() {});
+
+	this.midX = (node1.x + node2.x) / 2;
+	this.midY = (node1.y + node2.y) / 2;
+
+	console.log(
+		'[' + node1 + ' >> ' + node2 + ']  '
+		+ runden(this.isLength) + ' ' 
+		+ (this.isLength == this.targetLength ? '= ' : (this.isLength < this.targetLength ? '< ' : '> ')) 
+		+ this.targetLength  + ', mid: ' 
+		+ runden(this.midX) + '/' + runden(this.midY) 
+		+ ', diff: ' + runden(this.diff)
+		);
+*/
 		</script>
 
 	</body>
