@@ -6,7 +6,7 @@
 		<title>graph edge force layout experiment</title>
 
 		<script type="text/javascript" src="js/jquery-2.1.1.min.js"></script>
-		<script type="text/javascript" src="js/examples.js"></script>
+		<script type="text/javascript" src="js/examples.js"></script> <!-- regex to search for leading spaces ^[^\S\r\n]+ -->
 
 		<style>
 
@@ -73,22 +73,23 @@
 					<input type="submit" value="save" title="to download a graphml-file of the current graph. can be opened e.g. in yEd" onclick="downloadGraphML();">
 					<input type="submit" value="load" title="load a graphml-file as e.g. yEd creates it" onclick="$('#file-input').click();"><input type="file" id="file-input">
 					<select id='examplesList'>
-					  <option value="default">show example</option>
-					  <option value="TriangleMorph">triangle morph</option>
-					  <option value="6circles">6 circle</option>
-					  <option value="BathroomPattern">bathroom pattern</option>
-					  <option value="PyramidFold">pyramid fold</option>
-				  	  <option value="Bat">bat</option>
-					  <option value="K33">K3,3</option>
-					  <option value="K4">K4</option>
-					  <option value="K5">K5</option>
-					  <option value="K6">K6</option>
-				  	  <option value="K7">K7</option>
-					  <option value="K8">K8</option>
-					  <option value="K9">K9</option>
-					  <option value="K10">K10</option>
-					  <option value="K11">K11</option>
-					  <option value="K12">K12</option>	
+						<option value="default">show example</option>
+						<option value="TriangleMorph">triangle morph</option>
+					  	<option value="6circles">6 circle</option>
+					  	<option value="BathroomPattern">bathroom pattern</option>
+					 	<option value="PyramidFold">pyramid fold</option>
+				  	  	<option value="Bat">bat</option>
+					  	<option value="K33">K3,3</option>
+					  	<option value="umbrella">umbrella</option>
+					  	<option value="K4">K4</option>
+					  	<option value="K5">K5</option>
+					  	<option value="K6">K6</option>
+				  	  	<option value="K7">K7</option>
+					  	<option value="K8">K8</option>
+					  	<option value="K9">K9</option>
+					  	<option value="K10">K10</option>
+					  	<option value="K11">K11</option>
+					  	<option value="K12">K12</option>	
 					</select>
 					<br><br>
 					<table id='nodesTable' border='0'></table>
