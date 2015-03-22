@@ -1,7 +1,8 @@
 # GraphEdgeForce
 **This is a little experiment that came to my mind when I was thinking about how various graph layout algorithms might work.**
 
-Each edge has a target-length assigned. Deviation from that cause expanding or contracting forces onto the two nodes it is incident with.
+Each edge has a target-length assigned. Deviation from that cause expanding or contracting forces onto the two nodes it is incident with. The resulting behavior is that the graph 'seeks' to minimize its overall tension, the most comfortable configuration so to say. Often there are various 'valleys' of such kind - use of the shake buttons or the random repositioning of nodes can reveal those.
+
 
 - clicking on a node or edge deletes it
 - clicking on white space creates a new node
