@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>graph layout experiments</title>
+		<meta name="author" content="benjaminaaron">
+
+		<title>graph edge force layout experiment</title>
 
 		<script type="text/javascript" src="js/jquery-2.1.1.min.js"></script>
+		<script type="text/javascript" src="js/examples.js"></script>
 
 		<style>
 
@@ -11,52 +14,82 @@
 				font-family: Georgia, sans-serif;
 				font-size:  14px;
 			}
-			#goStopBtn{
+			#goPauseBtn {
 				font-size: 30px;
 				color: navy;
+				width: 120px;
 			}
-			.floatLeft{
+			.floatLeft {
 				float: left;
 			}
-			.edgeTableCellDiv{
+			.edgeTableCellDiv {
 				float: left;
 			}
-			.edgeTableCellInput{
+			.edgeTableCellInput {
 				float: right;
 				text-align: center;
 			}
-
-			/* for glow-animation after changing targetLength... TODO
-			.edgeTableCellWrapperDiv{
-    			background-color: #ff0000;
-			} */
+			#file-input {
+				display: none;
+			}
+			#author {
+				font-size:  11px;
+				color : silver;
+			}
+			.markedCell {
+				color : #999;
+			}
 
 		</style>
 
 	</head>
 	<body>
 
-
 		<canvas id="canvas" class='floatLeft' width="800" height="600"></canvas>
 
 		<table class='floatLeft'>
 			<tr>
 				<td valign='top'>
-					<input type="submit" id="goStopBtn" value="go" onclick="goStopClick()">
-					<input type="submit" value="reset" onclick="reset()">
+					
+					<input type="submit" id="goPauseBtn" value="go" title="start and pause the animation" onclick="goPauseClick();">
+					<input type="submit" value="reset" title="reloads the page" onclick="reset();">
+					<input type="submit" value="wipe" title="erases all nodes and edges" onclick="wipe(); window.requestAnimationFrame(draw);">
+					<input type="submit" value="?" title="show help" onclick="showHelp()">
+					
 					<br><br>
 					randomize:
-					<input type="submit" value="nodes" onclick="randomizeNodePositions()">
-					<input type="submit" value="edges" onclick="randomizeEdges()">
-					<input type="submit" value="n. + e." onclick="randomSetup(false)">
-					<input type="submit" value="n. + e. + target lengths" onclick="randomSetup(true)">
+					<input type="submit" value="node positions" title="randomizes the positions of the existing nodes" onclick="randomizeNodePositions();">
+					<input type="submit" value="edges" title="creates a new random set of edges among the existing nodes" onclick="randomizeEdges();">
 					<br><br>
 					shake:
-					<input type="submit" value="small" onclick="smallShake()">
-					<input type="submit" value="medium" onclick="mediumShake()">
-					<input type="submit" value="big" onclick="bigShake()">
+					<input type="submit" value="small" onclick="smallShake();">
+					<input type="submit" value="medium" onclick="mediumShake();">
+					<input type="submit" value="big" onclick="bigShake();">
 					<br><br>
-					<i>Coming up: save and load (own and gallery) nice configurations</i>
+					random setup:
+					<input type="submit" value="n. + e." title="wipes the existing nodes and edges, creates a new random setup with a fixed target length" onclick="randomSetup(false);">
+					<input type="submit" value="n. + e. + t.l." title="wipes the existing nodes and edges, creates a new random setup with random target lengths" onclick="randomSetup(true);">
+					<br><br>
+					<input type="submit" value="save" title="to download a graphml-file of the current graph. can be opened e.g. in yEd" onclick="downloadGraphML();">
+					<input type="submit" value="load" title="load a graphml-file as e.g. yEd creates it" onclick="$('#file-input').click();"><input type="file" id="file-input">
+					<select id='examplesList'>
+					  <option value="default">show example</option>
+					  <option value="TriangleMorph">triangle morph</option>
+					  <option value="6circles">6 circle</option>
+					  <option value="BathroomPattern">bathroom pattern</option>
+					  <option value="PyramidFold">pyramid fold</option>
+				  	  <option value="Bat">bat</option>
+					  <option value="K33">K3,3</option>
+					  <option value="K4">K4</option>
+					  <option value="K5">K5</option>
+					  <option value="K6">K6</option>
+				  	  <option value="K7">K7</option>
+					  <option value="K8">K8</option>
+					  <option value="K9">K9</option>
+					  <option value="K10">K10</option>
+					  <option value="K11">K11</option>
+					  <option value="K12">K12</option>	
+					</select>
 					<br><br>
 					<table id='nodesTable' border='0'></table>
 					<br>
@@ -64,75 +97,271 @@
 				</td>
 			</tr>
 		</table>
-
+		
 		<script>
 
 			//TODO add (anti-)gravity btwn nodes :)
-			//TODO change targetLengths
+
+			function showHelp(){
+				var text = 'This is a little experiment that came to my mind when I was thinking about how various graph layout algorithms might work.' 
+						+ '\n\nEach edge has a target-length assigned. Deviation from that cause expanding or contracting forces onto the two nodes it is incident with.'
+						+ '\n\n\u2022 clicking on a node or edge deletes it'
+						+ '\n\u2022 clicking on white space creates a new node'
+						+ '\n\u2022 mousedown on one node and mouseup on another one creates a new edge between the two'
+						+ '\n\u2022 while holding shift you can drag nodes'
+						+ '\n\u2022 the target length for each edge can be changed in the little input-fields - a change is confirmed with enter or once the input-field has been left with tab'
+						+ '\n\nSome more info appears when leaving the mouse on the buttons.'
+						+ '\n\nFeel free to send me cool setups as screenshots or graphml-files, I\'ll include them in the examples'
+						+ '\n\n@benjaminaaron, March 2015'
+						+ '\nbenjamin.degenhart@gmail.com';
+				alert(text);
+			}
+
+			$('#examplesList').on('change', function (e) {		
+				if(this.value != 'default'){	    
+			    	importGraphMLStr(examples[this.value], false);
+			    	document.getElementById('examplesList').options[0].selected = true;
+			    }
+			});
+
+			function wipe(){
+				$('#nodesTable').empty();
+				runningNodeCounter = 0;
+				nodes = [];
+				$('#edgesTable').empty();
+				runningEdgeCounter = 0;
+				edges = [];
+			}
+
+			function downloadGraphML(){
+				var defaultFilename = 'GraphExport_' + getTimestamp() + '.graphml';
+				var filename = prompt("Filename:", defaultFilename);
+
+				if(filename.split('.').length == 1)
+					filename = filename + '.graphml';
+
+				if (filename != null) {
+					var content = '<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:y="http://www.yworks.com/xml/graphml" xmlns:yed="http://www.yworks.com/xml/yed/3" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://www.yworks.com/xml/schema/graphml/1.1/ygraphml.xsd">\n  <key for="node" id="d6" yfiles.type="nodegraphics"/>\n  <key attr.name="description" attr.type="string" for="edge" id="d8"/>\n  <graph>\n'
+					for(var i=0; i < nodes.length ; i++)
+						content = content + '    <node id="node_' + nodes[i].id + '">\n      <data key="d6">\n        <y:ShapeNode>\n          <y:NodeLabel>' + nodes[i].id + '</y:NodeLabel>\n        </y:ShapeNode>\n      </data>\n    </node>\n';
+					for(var i=0; i < edges.length ; i++)
+						content = content + '    <edge id="edge_' + edges[i].id + '" source="node_' + edges[i].node1.id + '" target="node_' + edges[i].node2.id + '">\n      <data key="d8"><![CDATA[' + edges[i].targetLength + ']]></data>\n    </edge>\n';						
+					download(filename, content + '  </graph>\n</graphml>');
+				}
+			}
+
+			function download(filename, content) {
+				var a = window.document.createElement('a');
+				a.href = window.URL.createObjectURL(new Blob([content], {type: 'text/text'}));
+				a.download = filename;
+				document.body.appendChild(a)
+				a.click();
+				document.body.removeChild(a)
+			}
+
+			function getTimestamp() {
+			    var temp = new Date();
+			    return 	padStr(temp.getDate()) + padStr(1 + temp.getMonth()) + padStr(temp.getFullYear()) + 
+			   		 	'-' + padStr(temp.getHours()) +	padStr(temp.getMinutes()) +	padStr(temp.getSeconds());
+			}
+
+			function padStr(i) {
+			    return (i < 10) ? "0" + i : "" + i;
+			}
+
+			document.getElementById('file-input').addEventListener('change', loadFile, false);
+
+			function loadFile(e) {
+            	var file = e.target.files[0];
+          		if (!file) 
+            		return;
+          		var reader = new FileReader();
+          		reader.onload = function(e) {
+          			importGraphMLStr(e.target.result, true);
+            	}
+          		reader.readAsText(file);
+      		}
+
+      		function importGraphMLStr(graphMLstr, fromVisitorsDisk){
+          		wipe();
+
+            	var lines;
+            	if(fromVisitorsDisk){
+            		lines = graphMLstr.split('\n');
+            		for(var i=0; i < lines.length; i++)
+            			lines[i] = lines[i].trim();
+            	}
+            	else
+            		lines = graphMLstr.split('|');
+
+           		var IDmappingTable = [];
+
+           		for(var i=0; i < lines.length; i++){
+           			var line = lines[i];
+           			if(line.length > 5){
+           				if(line.substring(0, 5) == '<node'){
+           					var importedID = line.split('"')[1];
+           					//console.log(importedID);
+           					var importedNode = new node(0,0);
+           					IDmappingTable.push(new IDpair(importedID, importedNode.id));
+           					nodes.push(importedNode);
+           				}
+           				if(line.substring(0, 5) == '<edge'){
+           					var sourceImportedID = line.split('"')[3];
+           					var targetImportedID = line.split('"')[5];
+           					//console.log('source: ' + sourceImportedID); console.log('target: ' + targetImportedID);
+           					var sourceNode;
+           					var targetNode;
+           					for(var j=0; j < IDmappingTable.length; j++){ //TODO error catching
+           						var entry = IDmappingTable[j];
+           						if(entry.importedID == sourceImportedID)
+           							sourceNode = nodes[entry.assignedID]; //id = index
+           						if(entry.importedID == targetImportedID)
+           							targetNode = nodes[entry.assignedID];
+           					}
+           					var targetLengthImported = lines[i + 1].split('[')[2].split(']')[0];
+           					edges.push(new edge(sourceNode, targetNode, targetLengthImported));
+           				}
+           					
+           			}
+           		}
+           		console.log('import successful');
+           		smallShake();
+           		window.requestAnimationFrame(draw);
+      		}
+
+      		var IDpair = function(importedID, assignedID){
+      			this.importedID = importedID;
+      			this.assignedID = assignedID;
+      		}
 
 			var animate = false;
 			var ctx;
 			var screenToModelFactor = 100;
-			var width = 800;		
-			var xWidth = 8;
-			var xMin = -4;
-			var xMax = 4;
-			var height = 600;
+			var width = 900;		
+			var xWidth = 9;
+			var xMin = -4.5;
+			var xMax = 4.5;
+			var height = 600
 			var yHeight = 6;
 			var yMin = -3;
 			var yMax = 3;
 			var nodeRadius = 10;
+			var animationSpeed = 0.005;
 
 			$("#canvas").mousedown(function(e){handleMouseDown(e);});
 			$("#canvas").mouseup(function(e){handleMouseUp(e);});
+			$("#canvas").mousemove(function(e){handleMouseMove(e);});
 
-			var canvasOffset = $("#canvas").offset();
-		    var offsetX = canvasOffset.left;
-		    var offsetY = canvasOffset.top;
+		    function relMouseCoords(event){ //from http://stackoverflow.com/a/5932203/2474159
+			    var totalOffsetX = 0;
+			    var totalOffsetY = 0;
+			    var canvasX = 0;
+			    var canvasY = 0;
+			    var currentElement = this;
+			    do{
+			        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+			        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+			    }
+			    while(currentElement = currentElement.offsetParent)
+			    canvasX = event.pageX - totalOffsetX;
+			    canvasY = event.pageY - totalOffsetY;
+			    return {x:canvasX, y:canvasY}
+			}
+			HTMLCanvasElement.prototype.relMouseCoords = relMouseCoords;
 
-		    var mouseDownClickedNode = null;
+			var mouseDownClickedNode = null;
 
 			function handleMouseDown(e){
-				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / screenToModelFactor;
-			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / screenToModelFactor;
+				var coords = canvas.relMouseCoords(e);
+				var mouseX = (coords.x - width/2) / screenToModelFactor;
+				var mouseY = (height/2 - coords.y) / screenToModelFactor;
 			  	//console.log("mouse down: "+ mouseX + " / " + mouseY);		 
-			  	var isOnNodeResult = isOnNode(mouseX, mouseY);
-			  	if(isOnNodeResult){ // = mouse down on existing node
-			  		mouseDownClickedNode = isOnNodeResult;
+			  	var isNodeClickedResult = isNodeClicked(mouseX, mouseY);
+			  	if(isNodeClickedResult){ // = mouse down on existing node
+			  		mouseDownClickedNode = isNodeClickedResult;
 			  	}
+			}
+
+			var shiftWasPressed = false;
+
+			function handleMouseMove(e){
+				if(e.shiftKey && mouseDownClickedNode != null){
+					var coords = canvas.relMouseCoords(e);
+					var mouseX = (coords.x - width/2) / screenToModelFactor;
+					var mouseY = (height/2 - coords.y) / screenToModelFactor;
+					mouseDownClickedNode.x = mouseX;
+					mouseDownClickedNode.y = mouseY;
+					mouseDownClickedNode.locked = true; //movement locked
+					if(!animate)					
+			  			window.requestAnimationFrame(draw);
+			  		shiftWasPressed = true;
+				} else {
+					var coords = canvas.relMouseCoords(e);
+					var mouseX = (coords.x - width/2) / screenToModelFactor;
+					var mouseY = (height/2 - coords.y) / screenToModelFactor;
+					var isOnNodeResult = isNodeClicked(mouseX, mouseY);	
+					
+					if(isOnNodeResult)
+						$('#node_' + isOnNodeResult.id).addClass('markedCell');
+					else {
+						$('.nodeTableCell').removeClass('markedCell');
+						var isOnEdgeResult = isEdgeClicked(mouseX, mouseY);
+						if(isOnEdgeResult)
+							$('#edge_' + isOnEdgeResult.id).addClass('markedCell');
+						else
+							$('.edgeTableCellDiv').removeClass('markedCell');
+					}
+				}
 			}
 
 			function handleMouseUp(e){
-				mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / screenToModelFactor;
-			  	mouseY = (height/2 - parseInt(e.clientY - offsetY)) / screenToModelFactor;
-				//console.log("mouse up: "+ mouseX + " / " + mouseY);
+				if(!shiftWasPressed){
+					var coords = canvas.relMouseCoords(e);
+					var mouseX = (coords.x - width/2) / screenToModelFactor;
+					var mouseY = (height/2 - coords.y) / screenToModelFactor;			
 
-				var isOnNodeResult = isOnNode(mouseX, mouseY);	
+					var isNodeClickedResult = isNodeClicked(mouseX, mouseY);	
 
-			  	if(isOnNodeResult){ // = mouse up on existing node		  			  		
-			  		if(mouseDownClickedNode != null && mouseDownClickedNode != isOnNodeResult){	
-			  			console.log('new edge:');
-			  			edges.push(new edge(mouseDownClickedNode, isOnNodeResult));
-			  		} else {
-			  			console.log('deleting node ' + isOnNodeResult);
-			  			deleteEdgesIncidentWithNode(isOnNodeResult);
-						nodes.splice(nodes.indexOf(isOnNodeResult), 1);
-			  		}
-			  	} else { //not on any node with down or up
-			  		var isOnEdgeResult = isOnEdge(mouseX, mouseY);
-			  		if(isOnEdgeResult){
-			  			console.log('deleting edge ' + isOnEdgeResult);
-			  			edges.splice(edges.indexOf(isOnEdgeResult), 1);
-			  		} else {
-			  			console.log('new node');
-						nodes.push(new node(mouseX,mouseY));
-			  		}
-			  	}
+				  	if(isNodeClickedResult){ // = mouse up on existing node		  			  		
+				  		if(mouseDownClickedNode != null && mouseDownClickedNode != isNodeClickedResult){	 			
+				  			if(getEdgeExistsAlready(mouseDownClickedNode, isNodeClickedResult))
+				  				console.log('edge exists already');
+				  			else {
+				  				var newEdge = new edge(mouseDownClickedNode, isNodeClickedResult, 2);
+				  				console.log('new edge: ' + newEdge);
+				  				edges.push(newEdge);
+				  			}
+				  		} else {
+				  			console.log('deleting node ' + isNodeClickedResult);
+				  			deleteEdgesIncidentWithNode(isNodeClickedResult);
+							nodes.splice(nodes.indexOf(isNodeClickedResult), 1);
+							$('#node_' + isNodeClickedResult.id).parent().remove();
+				  		}
+				  	} else { //not on any node with down or up
+
+				  		var isEdgeClickedResult = isEdgeClicked(mouseX, mouseY);
+
+				  		if(isEdgeClickedResult){
+				  			console.log('deleting edge ' + isEdgeClickedResult);
+				  			edges.splice(edges.indexOf(isEdgeClickedResult), 1);
+				  			$('#edge_' + isEdgeClickedResult.id).parent().remove();
+				  		} else {
+				  			var newNode = new node(mouseX, mouseY);
+				  			console.log('new node: ' + newNode);
+							nodes.push(newNode);
+				  		}
+				  	}
+				  	window.requestAnimationFrame(draw);
+			  	} else {
+			  		console.log('node ' + mouseDownClickedNode.id + ' was moved');
+			  		mouseDownClickedNode.locked = false;
+			  	}	
 			  	mouseDownClickedNode = null;
-			  	window.requestAnimationFrame(draw);
+			  	shiftWasPressed = false;
 			}
 
-			function isOnNode(x, y){
+			function isNodeClicked(x, y){
 				for(var i=0; i < nodes.length; i++){
 					if(dist(x,y,nodes[i].x, nodes[i].y) <= nodeRadius / screenToModelFactor){
 						return nodes[i];
@@ -141,57 +370,49 @@
 				return false;
 			}
 
-			function isOnEdge(x, y){
+			function isEdgeClicked(x, y){
 				for(var i=0; i < edges.length; i++){
 					var edge = edges[i];
-		
-					//TODO catch case where line is exactly vertical
-
-					//(x,y) + alpha(x,y)
-					var lineOriginX = edge.node1.x;
-					var lineOriginY = edge.node1.y;
-					var lineDirvectX = edge.node2.x - edge.node1.x;
-					var lineDirvectY = edge.node2.y - edge.node1.y;
-
-					//ax + by = 0; //(x,y) + beta(x,y)
-					var orthLineOriginX = x;
-					var orthLineOriginY = y;
-					var orthLineDirvectX = 1;
-					var orthLineDirvectY = (- lineDirvectX * orthLineDirvectX) / lineDirvectY;
-
-					var matrixPos11 = lineDirvectX;
-					var matrixPos12 = - orthLineDirvectX;
-					var matrixPos13 = orthLineOriginX - lineOriginX;
-					var matrixPos21 = lineDirvectY;
-					var matrixPos22 = - orthLineDirvectY;
-					var matrixPos23 = orthLineOriginY - lineOriginY;
-
-					// one step gauss-elimination
-
-					var rowFact = matrixPos11 / matrixPos21;
-					var matrixPos21 = rowFact * matrixPos21 - matrixPos11; //test
-					var matrixPos22 = rowFact * matrixPos22 - matrixPos12;
-					var matrixPos23 = rowFact * matrixPos23 - matrixPos13;
-
-					/*console.log('matrix:');
-					console.log(matrixPos11 + '\t' + matrixPos12 + '\t|\t' + matrixPos13);
-					console.log(matrixPos21 + '\t' + matrixPos22 + '\t|\t' + matrixPos23);*/
-
-					var beta = matrixPos23 / matrixPos22; //alpha not needed
-
-					var intersectionX = orthLineOriginX + beta * orthLineDirvectX;
-					var intersectionY = orthLineOriginY + beta * orthLineDirvectY;
-
-					//console.log('intersection: ' + intersectionX + '|' + intersectionY);
-
-					var distSN1 = dist(edge.node1.x, edge.node1.y, intersectionX, intersectionY);
-					var distSN2 = dist(edge.node2.x, edge.node2.y, intersectionX, intersectionY);
-
-					var intersectionIsBtwnNodes = Math.abs(edge.getLength() - (distSN1 + distSN2)) < 0.1;
-					var distIntersectionClickIsWithinBuffer = dist(x, y, intersectionX, intersectionY) < 0.05;
-
-					if(intersectionIsBtwnNodes && distIntersectionClickIsWithinBuffer)
-						return edge;
+					if(edge.node1.y == edge.node2.y){ //special case if nodes have the same y-value
+						var xOkay = (x > edge.node1.x && x < edge.node2.x) || (x > edge.node2.x && x < edge.node1.x);
+						var yOkay = Math.abs(y - edge.node1.y) < 0.05;
+						if(xOkay && yOkay)
+							return edge;
+					} else {
+						//(x,y) + alpha(x,y)
+						var lineOriginX = edge.node1.x;
+						var lineOriginY = edge.node1.y;
+						var lineDirvectX = edge.node2.x - edge.node1.x;
+						var lineDirvectY = edge.node2.y - edge.node1.y;
+						//ax + by = 0; //(x,y) + beta(x,y)
+						var orthLineOriginX = x;
+						var orthLineOriginY = y;
+						var orthLineDirvectX = 1;
+						var orthLineDirvectY = (- lineDirvectX * orthLineDirvectX) / lineDirvectY;
+						var matrixPos11 = lineDirvectX;
+						var matrixPos12 = - orthLineDirvectX;
+						var matrixPos13 = orthLineOriginX - lineOriginX;
+						var matrixPos21 = lineDirvectY;
+						var matrixPos22 = - orthLineDirvectY;
+						var matrixPos23 = orthLineOriginY - lineOriginY;
+						// one step gauss-elimination
+						var rowFact = matrixPos11 / matrixPos21;
+						var matrixPos21 = rowFact * matrixPos21 - matrixPos11; //test
+						var matrixPos22 = rowFact * matrixPos22 - matrixPos12;
+						var matrixPos23 = rowFact * matrixPos23 - matrixPos13;
+						//console.log(matrixPos11 + '\t' + matrixPos12 + '\t|\t' + matrixPos13);
+						//console.log(matrixPos21 + '\t' + matrixPos22 + '\t|\t' + matrixPos23);
+						var beta = matrixPos23 / matrixPos22; //alpha not needed
+						var intersectionX = orthLineOriginX + beta * orthLineDirvectX;
+						var intersectionY = orthLineOriginY + beta * orthLineDirvectY;
+						//console.log('intersection: ' + intersectionX + '|' + intersectionY);
+						var distSN1 = dist(edge.node1.x, edge.node1.y, intersectionX, intersectionY);
+						var distSN2 = dist(edge.node2.x, edge.node2.y, intersectionX, intersectionY);
+						var intersectionIsBtwnNodes = Math.abs(edge.getLength() - (distSN1 + distSN2)) < 0.1;
+						var distIntersectionClickIsWithinBuffer = dist(x, y, intersectionX, intersectionY) < 0.05;
+						if(intersectionIsBtwnNodes && distIntersectionClickIsWithinBuffer)
+							return edge;
+					}
 				}
 				return false;
 			}
@@ -204,19 +425,20 @@
 					}
 				}
 				if(candidateIndex != -1){
-					edges.splice(candidateIndex, 1);
+					$('#edge_' + edges[candidateIndex].id).parent().remove();
+					edges.splice(candidateIndex, 1);				
 					deleteEdgesIncidentWithNode(node);
 				} 
 			}
 
-			function goStopClick(){			
-				var btn = document.getElementById("goStopBtn");
+			function goPauseClick(){			
+				var btn = document.getElementById("goPauseBtn");
 				if(btn.value == 'go'){
-					btn.value = 'stop';
+					btn.value = 'pause';
 					animate = true;
 					window.requestAnimationFrame(draw);
 				} else {
-					btn.value = 'go';
+					btn.value='go';
 					animate = false;
 				}	
 			}		
@@ -257,7 +479,6 @@
 				window.requestAnimationFrame(draw);
 			}
 
-
 			function dist(x1, y1, x2, y2){
 				return Math.sqrt(Math.pow(x2-x1,2) + Math.pow(y2-y1,2));
 			}
@@ -282,18 +503,21 @@
 				this.id = runningNodeCounter ++;
               	this.x = x,
             	this.y = y;
-
+            	this.locked = false;
 				var table = $('#nodesTable');
-				var tr = $('<tr/>').appendTo(table); 
+				var tr = $('<tr/>').appendTo(table); 			
 				var td = $('<td/>').attr({
+					'class' : 'nodeTableCell',
 					'id' : 'node_' + this.id
 				}).appendTo(tr); 
 
             	this.dx = 0;
 				this.dy = 0;
 				this.addToD = function(dx, dy){
-					this.dx = this.dx + dx;
-					this.dy = this.dy + dy;
+					if(!this.locked){
+						this.dx = this.dx + dx;
+						this.dy = this.dy + dy;
+					}
 				}
 				this.applyD = function(){
 					this.x = this.x + this.dx;
@@ -302,7 +526,7 @@
 					this.dy = 0;
 				}
             	this.toString = function(){
-            		return this.id + '(' + roundNumb(this.x,2) + '|' + roundNumb(this.y,2) + ')';
+            		return this.id;// + '(' + roundNumb(this.x,2) + '|' + roundNumb(this.y,2) + ')';
             	}
 			}
 
@@ -311,29 +535,27 @@
 
 			var edge = function(node1, node2, targetLength){
 				this.id = runningEdgeCounter ++;
-
 				this.node1 = node1;
 				this.node2 = node2;
 				this.targetLength = targetLength;
-
 				var table = $('#edgesTable');
 				var tr = $('<tr/>').appendTo(table); 
 				var td = $('<td/>').appendTo(tr); 
-/*				var wrapperDiv = $('<div/>').attr({
-					'class' : 'edgeTableCellWrapperDiv',
-					'id' : 'edgeWrap_' + this.id
-				}).appendTo(td);*/
 				var div = $('<div/>').attr({
 					'class' : 'edgeTableCellDiv',
 					'id' : 'edge_' + this.id
 				}).appendTo(td);
-
 				var input = $('<input/>').attr({
 					'type' : 'text',
 					'size' : 1,
 					'id' : 'edgeInput_' + this.id,
 					'class' : 'edgeTableCellInput'
 				}).appendTo(td).val(roundNumb(this.targetLength,1));
+
+				var self = this;
+				$(input).change(function() {
+					self.targetLength = $(input).val();
+				});
 
 				this.getLength = function(){
 					return dist(node1.x, node1.y, node2.x, node2.y);
@@ -352,7 +574,6 @@
 			function randomSetup(randomizeTargetLength){
 				randomizeNodes();
 				randomizeEdges(randomizeTargetLength);
-				activateInputFieldListener();
 			}
 
 			function randomizeNodes(){
@@ -375,42 +596,51 @@
 				while(i < numbEdges){
 					var node1Index = Math.round(Math.random() * (nodes.length - 1));
 					var node2Index = Math.round(Math.random() * (nodes.length - 1));
-					var edgeExistsAlready = node1Index == node2Index;
-					for(var j=0; j < createdEdgesRegister.length; j++)
-						if((node1Index + '_' + node2Index) == createdEdgesRegister[j])
-							edgeExistsAlready = true;
-					if(!edgeExistsAlready){
-						createdEdgesRegister.push(node1Index + '_' + node2Index);
-						createdEdgesRegister.push(node2Index + '_' + node1Index);
-						var targetLength = randomizeTargetLength ? Math.random() * 5 : 2;
-						var newEdge = new edge(nodes[node1Index], nodes[node2Index], targetLength);
-						edges.push(newEdge);
-						i++;
-					}
+					if(node1Index != node2Index)
+						if(!getEdgeExistsAlready(nodes[node1Index], nodes[node2Index])){
+							console.log('in here');
+							var targetLength = randomizeTargetLength ? Math.random() * 5 : 2;
+							var newEdge = new edge(nodes[node1Index], nodes[node2Index], targetLength);
+							edges.push(newEdge);
+							i++;
+						}
 				}
 				window.requestAnimationFrame(draw);
 			}
 
-			nodes.push(new node(-1,1.5));
-			nodes.push(new node(1.5,-0.5));
-			nodes.push(new node(-0.5,0));
-			nodes.push(new node(1,2));
-			nodes.push(new node(-2,1));
-			nodes.push(new node(0.5,-2));
-			nodes.push(new node(2.5,-1));
+			function getEdgeExistsAlready(node1, node2){
+				for(var i=0; i < edges.length; i++){
+					var edge = edges[i];
+					if(edge.node1.id == node1.id && edge.node2.id == node2.id)
+						return true;
+					if(edge.node2.id == node1.id && edge.node1.id == node2.id)
+						return true;					
+				}
+				return false;
+			}
+
+			//START SETUP, two nested and connected equilateral triangles
+			var sqrt3 = Math.pow(3, 0.5);
+			nodes.push(new node(0, sqrt3));
+			nodes.push(new node(-2, -sqrt3));
+			nodes.push(new node(2, -sqrt3));
 
 			edges.push(new edge(nodes[0], nodes[1], 2));
 			edges.push(new edge(nodes[0], nodes[2], 2));
-			edges.push(new edge(nodes[1], nodes[2], 2));
-			edges.push(new edge(nodes[1], nodes[3], 2));
-			edges.push(new edge(nodes[3], nodes[4], 2));
-			edges.push(new edge(nodes[2], nodes[4], 2));
-			edges.push(new edge(nodes[2], nodes[5], 2));
-			edges.push(new edge(nodes[1], nodes[6], 2));
+			edges.push(new edge(nodes[1], nodes[2], 1));
 
-/*			nodes.push(new node(1,1.5));
-			nodes.push(new node(3,2.5));
-			edges.push(new edge(nodes[0], nodes[1]));*/
+			nodes.push(new node(0, sqrt3 / 5));
+			nodes.push(new node(-0.4, -sqrt3 / 5));
+			nodes.push(new node(0.4, -sqrt3 / 5));
+
+			edges.push(new edge(nodes[3], nodes[4], 2));
+			edges.push(new edge(nodes[3], nodes[5], 2));
+			edges.push(new edge(nodes[4], nodes[5], 4));
+
+			edges.push(new edge(nodes[0], nodes[3], 4));
+			edges.push(new edge(nodes[1], nodes[4], 4));
+			edges.push(new edge(nodes[2], nodes[5], 4));	
+
 
 			function init(){
 			  	window.requestAnimationFrame(draw);
@@ -420,18 +650,15 @@
 				var ctx = document.getElementById('canvas').getContext('2d');
 			  	ctx.clearRect(0,0,width,height);		 	
 				ctx.save();
-
 				ctx.translate(width / 2, height / 2);
 
 				// DRAW COORD AXIS
 
 				ctx.strokeStyle = 'silver';	
-
 				ctx.beginPath();
 				ctx.moveTo(- width / 2, 0);
 				ctx.lineTo(width / 2, 0);
 				ctx.stroke();
-
 				ctx.beginPath();
 				ctx.moveTo(0, - height / 2);
 				ctx.lineTo(0, height / 2);
@@ -443,20 +670,32 @@
 					var edge = edges[i];
 					var node1 = edge.node1;
 					var node2 = edge.node2;	
-
 					var edgeTension = edge.getTension();
 
-					if(Math.abs(edgeTension - 1) < 0.05)
-						ctx.lineWidth = 3;
-					else
-						ctx.lineWidth = 2;
+					//calc line width
+
+					var lowerBound = 0.4;
+					var upperBound = 6;
+					//var targetTension = 1;
+					var lineWidhtAtTargetTension = 2;
+					var uMinusL = upperBound - lowerBound;
+					var curveCompressionFactor = Math.log(- uMinusL / (lowerBound - lineWidhtAtTargetTension)) / 1;
+					ctx.lineWidth = lowerBound + uMinusL * Math.pow(Math.E, - curveCompressionFactor * edgeTension);
+
+					//calc line color
 
 					if(edgeTension <= 1){ //too short
-							var col = Math.round(Math.pow(1 - edgeTension,0.3) * 255);
+							var col = Math.round(Math.sin(Math.acos(edgeTension)) * 255);	
 							ctx.strokeStyle = 'rgb(' + col + ',0,0)';
 					} else { //too long
-							var col = Math.round((1 - Math.pow(1/edgeTension,7)) * 255);
-							ctx.strokeStyle = 'rgb(0,0,' + col + ')';
+							var setMax = 2;
+							if(edgeTension >= setMax)
+								ctx.strokeStyle = 'rgb(0,0,255)';
+							else {					
+								var relativeBtwn1andSetMax = 1 - (edgeTension - 1) / (setMax - 1); // 1- because the half-circe is flipped (and translated by x=1) in comparison to the red-one btwn 0 and 1
+								var col = Math.round(Math.sin(Math.acos(relativeBtwn1andSetMax)) * 255);
+								ctx.strokeStyle = 'rgb(0,0,' + col + ')';
+							}						
 					}
 
 					ctx.beginPath();
@@ -464,7 +703,7 @@
 					ctx.lineTo(drawX(node2.x), drawY(node2.y));
 					ctx.stroke();
 
-					$('#edge_' + i).html('e' + edge.id + ' <strong>' + node1.id + '-' + node2.id + '</strong> (' + roundNumb(edgeTension,1) + ')&nbsp;&nbsp;');
+					$('#edge_' + edge.id).html('e' + edge.id + ' <strong>' + node1.id + '-' + node2.id + '</strong> (' + roundNumb(edgeTension,1) + ')&nbsp;&nbsp;');
 				
 					if(animate){
 						// calc forces that this edge enacts onto the two nodes it is incident with
@@ -472,10 +711,9 @@
 						var dyn1n2 = node2.y - node1.y;
 						var dxn2n1 = - dxn1n2;
 						var dyn2n1 = - dyn1n2;
-						var fact = 0.01;
 						var edgeDiff = edge.getLengthDiff();
-						node1.addToD(edgeDiff * fact * dxn1n2, edgeDiff * fact * dyn1n2);
-						node2.addToD(edgeDiff * fact * dxn2n1, edgeDiff * fact * dyn2n1);
+						node1.addToD(edgeDiff * animationSpeed * dxn1n2, edgeDiff * animationSpeed * dyn1n2);
+						node2.addToD(edgeDiff * animationSpeed * dxn2n1, edgeDiff * animationSpeed * dyn2n1);
 					}
 				}
 
@@ -487,18 +725,15 @@
 
 				for(var i = 0; i < nodes.length; i++){
 					var node = nodes[i];
-
 					ctx.fillStyle = 'navy';
 					ctx.beginPath();
 					ctx.arc(drawX(node.x), drawY(node.y), nodeRadius, 0, Math.PI*2); 
 					ctx.closePath();
 					ctx.fill();
-
 					ctx.fillStyle = 'white';
 					ctx.font="14px Georgia";
 					ctx.fillText(node.id, drawX(node.x) - 4, drawY(node.y) + 3);
-
-					$('#node_' + i).html('n<strong>' + node.id + '</strong> (' + roundNumb(node.x,2) + ',' + roundNumb(node.y,2) + ')');
+					$('#node_' + node.id).html('n<strong>' + node.id + '</strong> (' + roundNumb(node.x,2) + ',' + roundNumb(node.y,2) + ')');
 				}			
 
 				ctx.restore();
@@ -510,26 +745,71 @@
 			init();
 
 
-			function activateInputFieldListener(){
-				$("input[type='text']").change(function() {	
-					var newTargetLength = $(this).val();
-					var edgeID = $(this).context.id.split('_')[1];
-					var edge = edges[edgeID];
-					edge.targetLength = newTargetLength;
-				});
-	/*			$("input[type='text']").keypress(function(event) {
-				   console.log(this);
-				   console.log($(this).val() + event.key);
-				});*/
-			}
-
-			$(document).ready(function() {
-				activateInputFieldListener();
-			});
-			
-
-
 /*	PARKING LOT
+
+	<td class='sliderStruct'>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+	<td class='sliderStruct' valign="bottom">animation speed:&nbsp;&nbsp;</td>
+	<td class='sliderStruct' valign="bottom">					
+		<div class='sliderStruct' id="slider"></div>
+	</td>
+
+	#slider {
+		width:8em;
+	}
+
+	$(function() {
+		$("#slider").slider({
+        	value: 0.010,
+            min: 0.0005,
+            max: 0.100,
+            step: 0.0005,
+            slide: function(event, ui) {
+            	animationSpeed = $(this).slider('value');
+                console.log(animationSpeed);
+            }
+        });
+	});
+
+	$(document).ready(function() {});
+
+	nodes.push(new node(-1,1.5));
+	nodes.push(new node(1.5,-0.5));
+	nodes.push(new node(-0.5,0));
+	nodes.push(new node(1,2));
+	nodes.push(new node(-2,1));
+	nodes.push(new node(0.5,-2));
+	nodes.push(new node(2.5,-1));
+	edges.push(new edge(nodes[0], nodes[1], 2));
+	edges.push(new edge(nodes[0], nodes[2], 2));
+	edges.push(new edge(nodes[1], nodes[2], 2));
+	edges.push(new edge(nodes[1], nodes[3], 2));
+	edges.push(new edge(nodes[3], nodes[4], 2));
+	edges.push(new edge(nodes[2], nodes[4], 2));
+	edges.push(new edge(nodes[2], nodes[5], 2));
+	edges.push(new edge(nodes[1], nodes[6], 2));
+
+	$("input[type='text']").keypress(function(event) {
+		console.log(this);
+		console.log($(this).val() + event.key);
+	});
+
+	var col = Math.round(Math.pow(1 - edgeTension,0.3) * 255);
+	var col = Math.round((1 - Math.pow(1/edgeTension,7)) * 255);
+
+	if(Math.abs(edgeTension - 1) < 0.05)
+		ctx.lineWidth = 3;
+	else
+		ctx.lineWidth = 2;
+	var compressFactor = 2;
+	//first attempt with thin for too short AND too long
+	//y = - 0.5 ln (x-2) + 0.5(ln 2)     >>    Solve[y = - 0.5 ln (x-2) + 0.5(ln 2), x]
+	ctx.lineWidth = lowerBound + (upperBound - lowerBound) * Math.pow(Math.E, - compressFactor * Math.abs(edgeTension - 1));
+
+	var canvasOffset = $("#canvas").offset();
+	var offsetX = canvasOffset.left;
+	var offsetY = canvasOffset.top;
+	var mouseX = (parseInt(e.clientX - offsetX) - width/2 ) / screenToModelFactor;
+	var mouseY = (height/2 - parseInt(e.clientY - offsetY)) / screenToModelFactor;
 
 	// DRAW LINES (if any)
 	ctx.strokeStyle = 'green';
